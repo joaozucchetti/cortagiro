@@ -101,10 +101,7 @@
       { k: 'autoshift', type: 'toggle' },
       { k: 'flySpeed', type: 'range', min: 60, max: 400, step: 5, f: v => v + ' km/h' },
     ] },
-    { id: 'sound', open: true, items: [
-      { k: 'mic', type: 'seg', opts: MICS },
-      { k: 'env', type: 'seg', opts: ENVS },
-      { k: 'wet', type: 'range', min: 0, max: 1, step: 0.01, f: pct },
+    { id: 'sound', items: [
       { k: 'wind', type: 'range', min: 0, max: 1, step: 0.01, f: pct, show: p => p.mic === 'cabin' },
       { k: 'drive', type: 'range', min: 0, max: 1, step: 0.01, f: pct },
       { k: 'width', type: 'range', min: 0, max: 1, step: 0.01, f: pct },
@@ -127,7 +124,7 @@
       sec.items.forEach(it => {
         const T = I.it[it.k];
         const row = document.createElement('div');
-        row.className = 'ctl'; row.id = 'row-' + it.k;
+        row.className = 'ctl2'; row.id = 'row-' + it.k;
         const id = 'c-' + it.k;
         const q = T.info ? `<button type="button" class="q" aria-expanded="false" aria-controls="i-${it.k}" aria-label="?">?</button>` : '';
         if (it.type === 'toggle') {
@@ -222,7 +219,7 @@
   function setParam(k, v) {
     P[k] = v;
     if (k === 'exhaust' && v !== 'custom') Object.keys(EXH[v]).forEach(x => { if (x !== 'l') P[x] = EXH[v][x]; });
-    if (ITEMS[k].ex) P.exhaust = 'custom';
+    if (ITEMS[k] && ITEMS[k].ex) P.exhaust = 'custom';
     normalize();
     if (!SOUND_KEYS.includes(k)) presetId = null;
     applyConfig(k);
@@ -275,6 +272,11 @@
     const wheels = b.w.map(x => `<circle cx="${x}" cy="${39 - r}" r="${r}" fill="${COL.ink}"/><circle cx="${x}" cy="${39 - r}" r="${r * 0.42}" fill="${COL.plate}"/>`).join('');
     return `<svg class="thumb" viewBox="0 0 120 42" aria-hidden="true"><line x1="0" y1="39.5" x2="120" y2="39.5" stroke="${COL.line2}"/><path d="${b.d}" fill="${COL.ink}" stroke="${COL.ink}" stroke-width="1.2" stroke-linejoin="round"/>${wheels}</svg>`;
   }
+  const PH = window.RoncoPhotos || {};
+  function photoHTML(id, alt, fallback) {
+    const ph = PH[id];
+    return ph ? `<img src="${ph.src}" alt="" loading="lazy" decoding="async">` : `<div class="noimg">${fallback || ''}</div>`;
+  }
   const bodyOf = c => c.layout === 'rotary' ? 'gt' : c.cyl <= 2 && c.disp < 2 ? 'bike' : c.redline > 11000 ? 'f1' : c.cyl >= 10 ? 'super' : 'gt';
 
   // ---------- engine plate ----------
@@ -288,17 +290,18 @@
   function renderPlate() {
     const pr = allPresets().find(p => p.id === presetId);
     const flag = pr && pr.flag;
-    $('plPic').innerHTML = thumbSVG(pr && pr.body ? pr.body : bodyOf(P));
+    const ph = pr && PH[pr.id];
+    $('plPhoto').innerHTML = photoHTML(pr && pr.id, '', layoutTag(P));
+    if (ph) { const a = document.createElement('a'); a.className = 'credit'; a.href = ph.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '© ' + ph.artist + ' · ' + ph.license; $('plPhoto').appendChild(a); }
     $('plEyebrow').innerHTML = (flag ? flagSVG(flag) : '') + `<span></span>`;
     $('plEyebrow').lastChild.textContent = pr ? [flag ? COUNTRY[lang][flag] : null, ['race', 'moto', 'mine'].includes(pr.cat) ? I.cats[pr.cat] : null].filter(Boolean).join(' · ') : I.ui.custom;
     const h = pr && RoncoHistory[pr.id];
     const st = $('plStory');
-    st.hidden = !h;
-    if (h) { st.textContent = h.y + ' — ' + h[lang]; const b = document.createElement('button'); b.type = 'button'; b.textContent = I.ui.allStories; b.addEventListener('click', () => openGarage('history')); st.appendChild(b); }
+    $('btnStory').hidden = !h;
+    if (!h) { st.hidden = true; $('btnStory').setAttribute('aria-expanded', 'false'); }
+    else { st.textContent = h.y + ' — ' + h[lang]; const b = document.createElement('button'); b.type = 'button'; b.textContent = I.ui.allStories; b.addEventListener('click', () => openGarage('history')); st.appendChild(b); }
     $('plName').textContent = pr ? tx(pr.n) : I.ui.custom;
     $('plCode').textContent = pr ? locE(tx(pr.e)) : I.ui.customDesc;
-    const code = pr ? tx(pr.e).split(' · ')[0] : layoutTag(P);
-    $('plMark').textContent = code.length > 14 ? layoutTag(P) : code;
     const chips = [layoutTag(P), nf1.format(P.disp) + ' L', nf0.format(P.redline) + ' rpm', I.ind[P.induction], I.it.intake.o[P.intake], P.vtec && P.layout !== 'rotary' ? 'VTEC' : null, I.ui.order + ' ' + L.order].filter(Boolean);
     $('plChips').innerHTML = chips.map(c => `<span>${c}</span>`).join('');
     $('plPow').innerHTML = `${nf0.format(M.pk.P)}<small>${I.ui.powUnit}</small>`;
@@ -330,8 +333,8 @@
       const key = p.id + lang;
       const sp = specCache[key] || (specCache[key] = cardSpec(p));
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'card' + (p.id === presetId ? ' on' : '') + (p.mine ? ' mine' : '');
-      b.innerHTML = `<span class="top2"><span class="ct">${I.cats[p.cat]}</span>${p.flag ? flagSVG(p.flag) : ''}</span>${thumbSVG(p.body || sp.body)}<b></b><span class="cc"></span><span class="cs"><span>${sp.tag}</span><span>${sp.disp}</span><span>${sp.red} rpm</span><em>${sp.pow} ${I.ui.powUnit}</em></span>`;
+      b.type = 'button'; b.className = 'gcard' + (p.id === presetId ? ' on' : '') + (p.mine ? ' mine' : '');
+      b.innerHTML = `<span class="ph16">${photoHTML(p.mine ? null : p.id, '', sp.tag)}</span><span class="top2"><span class="ct">${I.cats[p.cat]}</span>${p.flag ? flagSVG(p.flag) : ''}</span><b></b><span class="cc"></span><span class="cs"><span>${sp.tag}</span><span>${sp.disp}</span><span>${sp.red} rpm</span><em>${sp.pow} ${I.ui.powUnit}</em></span>`;
       b.querySelector('b').textContent = tx(p.n);
       b.querySelector('.cc').textContent = locE(tx(p.e));
       b.addEventListener('click', () => { loadPreset(p); closeGarage(); });
@@ -361,7 +364,7 @@
       const h = RoncoHistory[p.id];
       const it = document.createElement('article');
       it.className = 'hitem';
-      it.innerHTML = `<div class="yr">${h.y}</div>${thumbSVG(p.body)}<div><h3>${flagSVG(p.flag)}<span></span><small></small></h3><p></p></div><button type="button" class="btn">${I.ui.load}</button>`;
+      it.innerHTML = `<div class="yr">${h.y}</div><div class="ph16">${photoHTML(p.id, '', '')}</div><div><h3>${flagSVG(p.flag)}<span></span><small></small></h3><p></p></div><button type="button" class="btn">${I.ui.load}</button>`;
       it.querySelector('h3 span').textContent = tx(p.n);
       it.querySelector('h3 small').textContent = locE(tx(p.e));
       it.querySelector('p').textContent = h[lang];
@@ -400,6 +403,10 @@
     const i = all.findIndex(p => p.id === presetId);
     loadPreset(all[((i < 0 ? (d > 0 ? -1 : 0) : i) + d + all.length) % all.length]);
   }
+  $('btnStory').addEventListener('click', () => {
+    const st = $('plStory'); st.hidden = !st.hidden;
+    $('btnStory').setAttribute('aria-expanded', String(!st.hidden));
+  });
   $('btnPrev').addEventListener('click', () => stepPreset(-1));
   $('btnNext').addEventListener('click', () => stepPreset(1));
 
@@ -493,8 +500,19 @@
   }
   function setEnv() { nodes.conv.buffer = makeIR(P.env); }
 
+  // Mobile browsers only allow audio started synchronously inside the tap; iOS also needs the
+  // "playback" session so the silent switch does not mute the page.
+  let acPending = null;
+  function unlockAudio() {
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    if (!acPending) acPending = new AudioContext({ latencyHint: 'interactive' });
+    acPending.resume();
+    const src = acPending.createBufferSource();
+    src.buffer = acPending.createBuffer(1, 1, acPending.sampleRate);
+    src.connect(acPending.destination); src.start(0);
+  }
   async function initAudio() {
-    const ac = new AudioContext({ latencyHint: 'interactive' });
+    const ac = acPending;
     await ac.audioWorklet.addModule('engine-core.js');
     await ac.audioWorklet.addModule('engine-worklet.js');
     ctx = ac;
@@ -516,6 +534,7 @@
     } catch (e) { showErr(I.ui.audioErr + e.message); throw e; }
   }
   async function power() {
+    unlockAudio();
     await ensureAudio();
     node.port.postMessage({ type: S.state === 'off' ? 'start' : 'stop' });
   }
@@ -550,6 +569,7 @@
   }
   async function toggleGyro() {
     if (gyro.on) { gyroOff(); thrUser = 0; setStatus(); return; }
+    unlockAudio();
     const DO = window.DeviceOrientationEvent, DM = window.DeviceMotionEvent;
     if (DO && typeof DO.requestPermission === 'function') {
       const r = await DO.requestPermission().catch(() => 'error');
@@ -572,7 +592,7 @@
   // ---------- input ----------
   function onWheel(e) { e.preventDefault(); thrUser = cl(thrUser - e.deltaY * (e.deltaMode === 1 ? 0.045 : 0.0011), 0, 1); lastWheel = performance.now(); }
   $('stage').addEventListener('wheel', onWheel, { passive: false });
-  document.querySelector('.engine').addEventListener('wheel', onWheel, { passive: false });
+  $('eng').addEventListener('wheel', onWheel, { passive: false });
 
   const pedal = $('pedal');
   function pedalAt(e) { const r = pedal.querySelector('.track').getBoundingClientRect(); thrUser = cl(1 - (e.clientY - r.top) / r.height, 0, 1); lastWheel = performance.now(); }

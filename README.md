@@ -26,10 +26,11 @@ vercel --prod # publica em produção
 
 ## Enviar para o GitHub
 
-A pasta já é um repositório git com o primeiro commit feito, na branch `main`.
-
 ```bash
 cd cortagiro
+git init -b main
+git add .
+git commit -m "Cortagiro: simulador de som de motor"
 gh repo create cortagiro --public --source=. --push
 # ou, com um repositório vazio criado no site do GitHub:
 git remote add origin https://github.com/SEU-USUARIO/cortagiro.git
@@ -50,6 +51,10 @@ python -m http.server 8000
 
 Funciona no celular, em site com HTTPS (a Vercel já é). No iPhone o Safari pede permissão ao tocar em **Giroscópio**. Incline para a frente para acelerar, gire para os lados para trocar de marcha e sacuda para dar um blip.
 
+## Fotos
+
+As fotos dos carros vêm do Wikimedia Commons, recortadas em 16:9. Autor e licença de cada uma estão em `photos.js` e aparecem sobre a foto no site.
+
 ## Arquivos
 
 | Arquivo | O que faz |
@@ -61,4 +66,5 @@ Funciona no celular, em site com HTTPS (a Vercel já é). No iPhone o Safari ped
 | `presets.js` | Configuração padrão e os 55 motores |
 | `history.js` | Histórias dos motores (PT, ES, EN) |
 | `i18n.js` | Textos da interface (PT, ES, EN) |
+| `photos.js` + `img/` | Fotos dos carros e créditos |
 | `vercel.json` | Configuração da Vercel |
