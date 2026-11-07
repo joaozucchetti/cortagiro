@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Cortagiro: simulador de som de motor no navegador, com 55 motores lendários.">
+<meta name="theme-color" content="#e3e4df">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Cortagiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Instrument+Sans:wght@400..600&family=Martian+Mono:wdth,wght@75..112.5,400..600&display=swap">
+<style>
+/* Layout: an engine test bench on paper. Stone ground, white instrument cards, black ink, one cobalt signal color.
+   Engine plate on top, sound strip under it, tuning sheet on the left, measurements below. */
+:root {
+  --bg: #e3e4df;
+  --panel: #f9f9f7;
+  --panel2: #efefeb;
+  --plate: #ffffff;
+  --line: #d4d5cf;
+  --line2: #b9bbb4;
+  --ink: #18191b;
+  --dim: #5c5f63;
+  --faint: #8a8d90;
+  --acc: #2747cc;
+  --acc-soft: #dfe5fb;
+  --amber: #b86e00;
+  --red: #d2382a;
+  --green: #17925a;
+  --violet: #7346c8;
+  --f-disp: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --f-body: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+  --f-mono: 'Martian Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; overflow: hidden; }
+* { box-sizing: border-box; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+kbd { font-family: var(--f-mono); font-size: 9px; color: var(--dim); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; background: var(--plate); }
+
+.app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+
+/* ---------- top bar ---------- */
+.top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 9px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line2); background: var(--plate); }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand b { font-family: var(--f-disp); font-stretch: 125%; font-weight: 800; font-size: 21px; letter-spacing: 0.02em; line-height: 1; }
+.brand span { color: var(--faint); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+.btn { border: 1px solid var(--line2); background: var(--plate); border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.btn:hover { border-color: var(--ink); }
+.btn.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.btn.on kbd { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .5); }
+.btn.power { background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn.power kbd { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .4); }
+.btn.power.running { background: var(--plate); color: var(--red); border-color: var(--red); }
+.btn.power.running kbd { color: var(--red); border-color: var(--red); }
+.seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 999px; overflow: hidden; background: var(--plate); }
+.seg button { background: transparent; border: 0; padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: var(--dim); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--ink); color: #fff; }
+.seg.lang button { font-family: var(--f-mono); font-size: 10.5px; padding: 6px 9px; }
+
+.body { display: grid; grid-template-columns: 330px minmax(0, 1fr); min-height: 0; }
+
+/* ---------- tuning sheet ---------- */
+.rail { border-right: 1px solid var(--line2); overflow-y: auto; background: var(--panel); padding-bottom: 40px; }
+.rail details { border-bottom: 1px solid var(--line); }
+.rail summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; gap: 10px; font-family: var(--f-disp); font-stretch: 112%; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
+.rail summary::-webkit-details-marker { display: none; }
+.rail summary::after { content: '+'; margin-left: auto; color: var(--faint); font-family: var(--f-mono); }
+.rail details[open] summary::after { content: '–'; }
+.ctl { padding: 6px 16px 11px; display: grid; gap: 6px; }
+.ctl[hidden] { display: none !important; }
+.ctl-h { display: flex; align-items: center; gap: 8px; }
+.ctl-h label { color: var(--ink); font-size: 13px; font-weight: 500; }
+.ctl-h output { margin-left: auto; font-family: var(--f-mono); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ctl .seg { display: flex; flex-wrap: wrap; border-radius: 6px; }
+.ctl .seg button { flex: 1 1 auto; padding: 6px 6px; }
+.ctl select, .sbar select { width: 100%; background: var(--plate); border: 1px solid var(--line2); border-radius: 6px; padding: 6px 8px; }
+.switch { font-size: 13px; font-weight: 500; cursor: pointer; }
+input.sw { appearance: none; -webkit-appearance: none; width: 34px; height: 19px; border-radius: 10px; background: var(--line2); position: relative; cursor: pointer; flex: none; margin: 0 0 0 auto; }
+input.sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: left .15s; }
+input.sw:checked { background: var(--acc); }
+input.sw:checked::after { left: 17px; }
+.q { flex: none; width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--line2); background: var(--plate); color: var(--dim); font: 600 9.5px/1 var(--f-mono); padding: 0; display: inline-grid; place-items: center; }
+.q:hover, .q.on { border-color: var(--acc); color: #fff; background: var(--acc); }
+.desc { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.45; }
+.info { margin: 0; padding: 9px 11px; border-radius: 6px; background: var(--acc-soft); color: var(--ink); font-size: 12.5px; line-height: 1.5; }
+.note { margin: 0; padding: 4px 16px 14px; color: var(--faint); font-size: 12px; line-height: 1.45; }
+.note[hidden] { display: none; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; }
+input[type=range]::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--ink) var(--pct, 50%), var(--line2) var(--pct, 50%)); }
+input[type=range]::-moz-range-track { height: 3px; border-radius: 2px; background: var(--line2); }
+input[type=range]::-moz-range-progress { height: 3px; border-radius: 2px; background: var(--ink); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; margin-top: -6px; border-radius: 50%; background: var(--plate); border: 2px solid var(--ink); }
+input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--plate); border: 2px solid var(--ink); }
+
+/* ---------- main ---------- */
+.main { overflow-y: auto; display: grid; gap: 12px; padding-block: 12px; padding-left: 12px; padding-right: max(12px, env(safe-area-inset-right, 0px)); grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: max-content max-content minmax(330px, 1.6fr) minmax(190px, 1fr) max-content; grid-template-areas: "plate plate plate" "sound sound sound" "stage stage engine" "scope spec dyno" "keys keys keys"; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ph { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-family: var(--f-disp); font-stretch: 112%; font-weight: 700; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ph .meta { margin-left: auto; font-family: var(--f-mono); font-weight: 400; font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph select { background: var(--plate); border: 1px solid var(--line2); border-radius: 4px; font-family: var(--f-mono); font-size: 10px; padding: 2px 4px; letter-spacing: 0; text-transform: none; }
+.cv { flex: 1; min-height: 0; position: relative; }
+.cv canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* engine plate */
+.plate { grid-area: plate; position: relative; overflow: hidden; border: 1px solid var(--line2); border-radius: 8px; background: var(--plate); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px 26px; padding: 16px 18px; }
+.plate-mark { position: absolute; right: -8px; bottom: -26px; font-family: var(--f-disp); font-stretch: 125%; font-weight: 800; font-size: 120px; line-height: 1; color: transparent; -webkit-text-stroke: 1px var(--line); white-space: nowrap; pointer-events: none; user-select: none; }
+.plate-pic { position: relative; width: 190px; display: grid; gap: 8px; justify-items: start; }
+.plate-pic .thumb { width: 190px; height: 70px; }
+.plate-id { position: relative; min-width: 0; display: grid; gap: 4px; }
+.eyebrow { display: flex; align-items: center; gap: 7px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+.plate h1 { margin: 0; font-family: var(--f-disp); font-stretch: 125%; font-weight: 800; font-size: clamp(26px, 3.3vw, 44px); line-height: 0.98; letter-spacing: -0.01em; text-transform: uppercase; text-wrap: balance; }
+.plate .code { font-family: var(--f-mono); font-size: 11.5px; color: var(--dim); }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.chips span { font-family: var(--f-mono); font-size: 10px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--ink); background: var(--panel); }
+.story { margin: 6px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.5; color: var(--dim); }
+.story button { border: 0; background: none; padding: 0; color: var(--acc); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; margin-left: 4px; }
+.plate-side { position: relative; display: grid; gap: 12px; justify-items: end; }
+.plate-stats { display: flex; gap: 22px; }
+.stat { display: grid; gap: 1px; }
+.stat label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.stat b { font-family: var(--f-disp); font-stretch: 75%; font-weight: 700; font-size: 40px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat b small { font-family: var(--f-body); font-stretch: 100%; font-size: 12px; color: var(--dim); font-weight: 500; margin-left: 3px; }
+.stat span { font-family: var(--f-mono); font-size: 10px; color: var(--dim); }
+.stat.pw b { color: var(--amber); }
+.stat.tq b { color: var(--acc); }
+.plate-nav { display: flex; gap: 6px; align-items: center; }
+.plate-nav .arrow { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line2); background: var(--plate); font-size: 17px; line-height: 1; display: grid; place-items: center; }
+.plate-nav .arrow:hover { border-color: var(--ink); }
+.btn.garage-btn { height: 34px; background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn.garage-btn kbd { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .4); }
+.flag { width: 24px; height: 16px; flex: none; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .14); display: block; }
+
+/* sound strip */
+.sbar { grid-area: sound; display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.6fr) 170px; gap: 10px 18px; align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+.sbar h2 { margin: 2px 0 0; font-family: var(--f-disp); font-stretch: 112%; font-weight: 800; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+.sgrp { display: grid; gap: 6px; min-width: 0; }
+.sgrp > label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.sgrp .seg { display: flex; flex-wrap: wrap; border-radius: 6px; }
+.sgrp .seg button { flex: 1 1 auto; padding: 7px 9px; }
+.sgrp .desc { min-height: 2.9em; }
+.sgrp output { font-family: var(--f-mono); font-size: 10px; color: var(--dim); }
+
+/* stage */
+.stage { grid-area: stage; display: grid; grid-template-columns: minmax(0, 1fr) 190px 56px; position: relative; touch-action: none; background: var(--plate); }
+.tachwrap { position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.leds { display: flex; justify-content: center; gap: 5px; padding-top: 12px; }
+.leds i { width: 13px; height: 7px; border-radius: 2px; background: var(--line); }
+.leds i.g { background: var(--green); }
+.leds i.a { background: var(--amber); }
+.leds i.r { background: var(--red); }
+.leds i.b { background: var(--acc); }
+.starter { position: absolute; left: 50%; top: 54%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 10px; text-align: center; }
+.starter button { width: 112px; height: 112px; border-radius: 50%; border: 0; background: var(--ink); color: #fff; font-family: var(--f-disp); font-stretch: 112%; font-weight: 800; font-size: 15px; letter-spacing: 0.08em; line-height: 1.1; box-shadow: 0 0 0 6px var(--plate), 0 0 0 7px var(--line2); }
+.starter button:hover { background: var(--acc); }
+.starter small { color: var(--dim); font-size: 12px; max-width: 230px; background: var(--plate); padding: 4px 8px; border-radius: 4px; }
+.status { position: absolute; left: 12px; right: 12px; bottom: 10px; font-size: 11.5px; color: var(--faint); display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.status.toast { color: var(--ink); font-weight: 500; }
+.status svg { flex: none; }
+
+.telem { border-left: 1px solid var(--line); display: grid; grid-auto-rows: min-content; align-content: start; }
+.tile { padding: 7px 14px 6px; border-bottom: 1px solid var(--line); display: grid; gap: 1px; }
+.tile label { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.tile .v { font-family: var(--f-disp); font-stretch: 75%; font-weight: 700; font-size: 27px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile .v small { font-family: var(--f-body); font-stretch: 100%; font-size: 11px; color: var(--dim); font-weight: 500; margin-left: 3px; }
+.bar { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 5px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--amber); }
+.lamps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 10px 12px; }
+.lamp { font-family: var(--f-disp); font-stretch: 100%; font-weight: 700; font-size: 10.5px; letter-spacing: 0.06em; text-align: center; padding: 3px 0; border-radius: 3px; border: 1px solid var(--line); color: var(--faint); }
+.lamp.on { color: #fff; border-color: transparent; }
+.lamp.on[data-c=vtec] { background: var(--amber); }
+.lamp.on[data-c=cut], .lamp.on[data-c=pop] { background: var(--red); }
+.lamp.on[data-c=bov], .lamp.on[data-c=gyro] { background: var(--acc); }
+.lamp.on[data-c=als], .lamp.on[data-c=lc] { background: var(--violet); }
+
+.pedal { border-left: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0; cursor: ns-resize; user-select: none; }
+.pedal label { font-size: 9.5px; letter-spacing: 0.12em; color: var(--faint); font-weight: 600; writing-mode: vertical-rl; transform: rotate(180deg); }
+.pedal .track { flex: 1; width: 20px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line2); position: relative; overflow: hidden; }
+.pedal .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--ink); }
+.pedal output { font-family: var(--f-mono); font-size: 10px; }
+
+.engine { grid-area: engine; }
+.scope { grid-area: scope; }
+.spec { grid-area: spec; }
+.dyno { grid-area: dyno; }
+.keys { grid-area: keys; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--dim); font-size: 12px; padding: 2px 4px 8px; }
+.keys span { white-space: nowrap; }
+.keys kbd { margin-right: 4px; }
+.err { color: var(--red); font-size: 12px; }
+
+/* ---------- garage overlay ---------- */
+.gov { position: fixed; inset: 0; z-index: 20; background: rgba(24, 25, 27, .42); display: grid; place-items: center; padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.gbox { width: min(1200px, 100%); height: min(840px, 100%); background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
+.ghead { display: flex; align-items: center; gap: 14px; padding: 14px 18px 10px; flex-wrap: wrap; }
+.ghead h2 { margin: 0; font-family: var(--f-disp); font-stretch: 125%; font-weight: 800; font-size: 26px; text-transform: uppercase; line-height: 1; }
+.gtabs { display: inline-flex; }
+.ghead .x { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line2); background: var(--plate); font-size: 18px; flex: none; }
+.gtools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 18px 12px; border-bottom: 1px solid var(--line); }
+.gtools[hidden] { display: none; }
+.gtools input { flex: 1 1 220px; min-width: 0; background: var(--plate); border: 1px solid var(--line2); border-radius: 999px; padding: 8px 14px; }
+.gtools p { margin: 0; color: var(--dim); font-size: 13px; }
+.cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.cats button { border: 1px solid var(--line2); background: var(--plate); border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 600; color: var(--dim); display: inline-flex; align-items: center; gap: 6px; }
+.cats button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.cats button small { font-family: var(--f-mono); font-weight: 400; font-size: 10px; opacity: .7; }
+.ggrid { overflow-y: auto; padding: 14px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; align-content: start; }
+.card { text-align: left; background: var(--plate); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; display: grid; gap: 4px; position: relative; }
+.card:hover { border-color: var(--ink); }
+.card.on { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+.card .top2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card .ct { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.card .thumb { width: 100%; height: 50px; margin: 2px 0; }
+.card b { font-family: var(--f-disp); font-stretch: 112%; font-weight: 700; font-size: 15px; line-height: 1.1; }
+.card.on b { color: var(--acc); }
+.card .cc { font-family: var(--f-mono); font-size: 9.5px; color: var(--dim); }
+.card .cs { display: flex; flex-wrap: wrap; gap: 2px 10px; white-space: nowrap; margin-top: 3px; font-family: var(--f-mono); font-size: 10px; }
+.card .cs em { font-style: normal; color: var(--amber); font-weight: 600; }
+.card .del { position: absolute; top: 8px; right: 8px; border: 1px solid var(--line2); background: var(--plate); border-radius: 999px; font-size: 11px; padding: 1px 8px; color: var(--dim); }
+.card.mine { border-style: dashed; }
+.gempty { color: var(--faint); grid-column: 1 / -1; padding: 20px 0; }
+.gsave { display: flex; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.gsave[hidden] { display: none; }
+.gsave input { flex: 1 1 200px; min-width: 0; background: var(--plate); border: 1px solid var(--line2); border-radius: 999px; padding: 7px 14px; }
+/* history timeline */
+.hist { overflow-y: auto; padding: 8px 18px 24px; }
+.hist[hidden] { display: none; }
+.hitem { display: grid; grid-template-columns: 74px 170px minmax(0, 1fr) auto; gap: 6px 18px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.hitem .yr { font-family: var(--f-disp); font-stretch: 75%; font-weight: 700; font-size: 30px; line-height: 1; color: var(--acc); font-variant-numeric: tabular-nums; }
+.hitem .thumb { width: 170px; height: 56px; }
+.hitem h3 { margin: 0 0 3px; display: flex; align-items: center; gap: 8px; font-family: var(--f-disp); font-stretch: 112%; font-weight: 700; font-size: 16px; }
+.hitem h3 small { font-family: var(--f-mono); font-weight: 400; font-size: 10px; color: var(--dim); }
+.hitem p { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.5; max-width: 80ch; }
+
+@media (max-width: 1180px) {
+  .main { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: max-content max-content minmax(330px, auto) 260px 220px max-content; grid-template-areas: "plate plate" "sound sound" "stage stage" "engine dyno" "scope spec" "keys keys"; }
+  .sbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .sbar h2 { grid-column: 1 / -1; }
+}
+@media (max-width: 860px) {
+  body { overflow: auto; }
+  .app { height: auto; display: block; }
+  .body { display: flex; flex-direction: column; }
+  .rail { order: 2; border-right: 0; overflow: visible; }
+  .main { order: 1; overflow: visible; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-auto-rows: auto; grid-template-areas: "plate" "sound" "stage" "engine" "dyno" "scope" "spec" "keys"; }
+  .plate { grid-template-columns: minmax(0, 1fr); }
+  .plate-side { justify-items: start; }
+  .plate-mark { font-size: 80px; }
+  .stat b { font-size: 32px; }
+  .sbar { grid-template-columns: minmax(0, 1fr); }
+  .stage { grid-template-columns: minmax(0, 1fr) 54px; grid-template-rows: 340px auto; }
+  .telem { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .telem .lamps { grid-column: 1 / -1; grid-template-columns: repeat(6, 1fr); }
+  .pedal { grid-row: 1; grid-column: 2; }
+  .engine, .dyno, .scope, .spec { height: 240px; }
+  .rail summary, .ctl, .note { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .brand span, .starter small, .keys, #segThr, .top kbd, .status:not(.toast) { display: none; }
+  .gbox { height: 100%; }
+  .hitem { grid-template-columns: 60px minmax(0, 1fr); }
+  .hitem .thumb { display: none; }
+  .hitem p, .hitem .btn { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { input.sw::after { transition: none; } }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="28" height="20" viewBox="0 0 30 22" fill="none" aria-hidden="true"><path d="M4 19a11 11 0 1 1 22 0" stroke="#b9bbb4" stroke-width="3"/><path d="M4 19a11 11 0 0 1 17.8-8.6" stroke="#2747cc" stroke-width="3"/><path d="M15 19l7-9" stroke="#18191b" stroke-width="2" stroke-linecap="round"/></svg>
+      <b>CORTAGIRO</b><span data-i="brandSub"></span>
+    </div>
+    <div class="seg lang" id="segLang" role="group"><button type="button" data-v="pt">PT</button><button type="button" data-v="es">ES</button><button type="button" data-v="en">EN</button></div>
+    <button class="btn power" id="btnPower" type="button"><span id="powerTxt"></span> <kbd>I</kbd></button>
+    <div class="seg" id="segDrive" role="group"><button type="button" data-v="n" data-i="neutral"></button><button type="button" data-v="d" data-i="drive"></button></div>
+    <div class="seg" id="segThr" role="group"><button type="button" data-v="hold" data-i="pedalHold"></button><button type="button" data-v="spring" class="on" data-i="pedalSpring"></button></div>
+    <button class="btn" id="btnGyro" type="button"><span data-i="gyro"></span></button>
+    <button class="btn" id="btnFly" type="button"><span data-i="flyby"></span> <kbd>F</kbd></button>
+    <button class="btn" id="btnRand" type="button"><span data-i="random"></span> <kbd>R</kbd></button>
+  </header>
+  <div class="body">
+    <aside class="rail" id="rail"></aside>
+    <main class="main" id="main">
+      <section class="plate" id="plate">
+        <div class="plate-mark" id="plMark" aria-hidden="true"></div>
+        <div class="plate-pic" id="plPic"></div>
+        <div class="plate-id">
+          <div class="eyebrow" id="plEyebrow"></div>
+          <h1 id="plName"></h1>
+          <div class="code" id="plCode"></div>
+          <div class="chips" id="plChips"></div>
+          <p class="story" id="plStory" hidden></p>
+        </div>
+        <div class="plate-side">
+          <div class="plate-stats">
+            <div class="stat pw"><label data-i="peakPow"></label><b id="plPow"></b><span id="plPowR"></span></div>
+            <div class="stat tq"><label data-i="peakTq"></label><b id="plTq"></b><span id="plTqR"></span></div>
+          </div>
+          <div class="plate-nav">
+            <button class="arrow" type="button" id="btnPrev">‹</button>
+            <button class="btn garage-btn" type="button" id="btnGarage"><span id="garageTxt"></span> <kbd>G</kbd></button>
+            <button class="arrow" type="button" id="btnNext">›</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="sbar" id="sbar">
+        <h2 data-i="soundTitle"></h2>
+        <div class="sgrp"><label id="sbMicL"></label><div class="seg" id="sbMic" role="group"></div><p class="desc" id="sbMicD"></p></div>
+        <div class="sgrp"><label id="sbEnvL"></label><div class="seg" id="sbEnv" role="group"></div><p class="desc" id="sbEnvD"></p></div>
+        <div class="sgrp"><label id="sbWetL" for="sbWet"></label><input type="range" id="sbWet" min="0" max="1" step="0.01"><output id="sbWetO"></output></div>
+      </section>
+
+      <section class="panel stage" id="stage">
+        <div class="tachwrap">
+          <div class="leds" id="leds"></div>
+          <div class="cv"><canvas id="tach"></canvas></div>
+          <div class="starter" id="starter">
+            <button type="button" id="btnStart">ENGINE<br>START</button>
+            <small data-i="starterHint"></small>
+          </div>
+          <div class="status" id="status"></div>
+        </div>
+        <div class="telem">
+          <div class="tile"><label data-i="powNow"></label><div class="v" id="tPow">0<small id="tPowU"></small></div></div>
+          <div class="tile"><label data-i="tqNow"></label><div class="v" id="tTq">0<small>N·m</small></div></div>
+          <div class="tile"><label data-i="boost"></label><div class="v" id="tBoost">0<small>bar</small></div><div class="bar"><i id="tBoostBar"></i></div></div>
+          <div class="tile"><label data-i="fireFreq"></label><div class="v" id="tFire">0<small>Hz</small></div></div>
+          <div class="tile"><label data-i="speed"></label><div class="v" id="tSpd">0<small>km/h</small></div></div>
+          <div class="lamps">
+            <div class="lamp" data-c="vtec" id="lVtec">VTEC</div>
+            <div class="lamp" data-c="cut" id="lCut" data-i="lampCut"></div>
+            <div class="lamp" data-c="pop" id="lPop">POP</div>
+            <div class="lamp" data-c="bov" id="lBov">BOV</div>
+            <div class="lamp" data-c="als" id="lAls">ALS</div>
+            <div class="lamp" data-c="lc" id="lLc" data-i="lampLaunch"></div>
+          </div>
+        </div>
+        <div class="pedal" id="pedal" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+          <output id="pedalOut">0%</output>
+          <div class="track"><div class="fill" id="pedalFill"></div></div>
+          <label data-i="pedal"></label>
+        </div>
+      </section>
+
+      <section class="panel engine">
+        <div class="ph"><span data-i="pEngine"></span> <span class="meta" id="engMeta"></span>
+          <select id="slowSel"><option value="0.01">1/100×</option><option value="0.025" selected>1/40×</option><option value="0.1">1/10×</option><option value="1">1×</option></select>
+        </div>
+        <div class="cv"><canvas id="eng"></canvas></div>
+      </section>
+      <section class="panel scope"><div class="ph"><span data-i="pScope"></span> <span class="meta" data-i="pScopeMeta"></span></div><div class="cv"><canvas id="scope"></canvas></div></section>
+      <section class="panel spec"><div class="ph"><span data-i="pSpec"></span> <span class="meta" id="specMeta"></span></div><div class="cv"><canvas id="spec"></canvas></div></section>
+      <section class="panel dyno"><div class="ph"><span data-i="pDyno"></span> <span class="meta" id="dynoMeta"></span></div><div class="cv"><canvas id="dyno"></canvas></div></section>
+
+      <div class="keys" id="keys"></div>
+    </main>
+  </div>
+</div>
+
+<div class="gov" id="gov" hidden>
+  <div class="gbox" role="dialog" aria-modal="true" aria-labelledby="gTitle">
+    <div class="ghead">
+      <h2 id="gTitle" data-i="garageTitle"></h2>
+      <div class="seg gtabs" id="gTabs" role="tablist"><button type="button" data-v="engines" data-i="tabEngines" class="on"></button><button type="button" data-v="history" data-i="tabHistory"></button></div>
+      <button class="x" type="button" id="gClose">×</button>
+    </div>
+    <div class="gtools" id="gTools"><input id="gSearch" type="search" autocomplete="off"><div class="cats" id="gCats"></div></div>
+    <div class="gtools" id="hTools" hidden><p data-i="histSub"></p></div>
+    <div class="ggrid" id="gGrid"></div>
+    <div class="hist" id="hList" hidden></div>
+    <form class="gsave" id="gSave"><input id="saveName" maxlength="40"><button class="btn" type="submit" data-i="save"></button></form>
+  </div>
+</div>
+<script src="engine-core.js"></script>
+<script src="presets.js"></script>
+<script src="i18n.js"></script>
+<script src="history.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
